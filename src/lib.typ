@@ -18,6 +18,66 @@
 
 #let __todo-list = state("todo-items", ())
 
+#let __todo-item(text, state) = {
+  let separator = ": "
+  let split-at = text.position(separator)
+
+  if split-at == none {
+    (group: none, txt: text, state: __todo-state(state))
+  } else {
+    let group = text.slice(0, split-at)
+    let body = text.slice(split-at + separator.len())
+
+    if group == "" or body == "" {
+      (group: none, txt: text, state: __todo-state(state))
+    } else {
+      (group: group, txt: body, state: __todo-state(state))
+    }
+  }
+}
+
+#let __todo-groups(items) = {
+  let groups = ()
+
+  for item in items {
+    if not (item.group in groups) {
+      groups.push(item.group)
+    }
+  }
+
+  groups
+}
+
+#let __render-todo-group(items) = {
+  let texts = items.map(item => item.txt)
+  set enum(numbering: "1.a)")
+  enum(..texts)
+}
+
+#let __render-todo-list(items, empty, strike-items: false) = {
+  if items.len() == 0 {
+    [#empty]
+  } else {
+    for group in __todo-groups(items) {
+      let grouped = items.filter(item => item.group == group)
+      let content = if strike-items {
+        strike(__render-todo-group(grouped))
+      } else {
+        __render-todo-group(grouped)
+      }
+
+      if group == none {
+        content
+      } else {
+        [
+          #heading(level: 2, text(fill: green, group))
+          #content
+        ]
+      }
+    }
+  }
+}
+
 // Function to add a TODO note
 #let todo(
   text: "TODO: Implement this",
@@ -27,7 +87,7 @@
   // If show-in-list, add to global state for later listing
   if show-in-list {
     __todo-list.update(items => {
-      items.push((txt: text, state: __todo-state(state)))
+      items.push(__todo-item(text, state))
       items
     })
   }
@@ -46,30 +106,12 @@
     let abondon = items.filter(item => item.state == TodoState.Abandoned)
 
     heading(level: 1, title)
-    if pending.len() == 0 {
-        [No TODO items found.]
-    } else {
-        let texts = pending.map(item => item.txt)
-        set enum(numbering: "1.a)")
-        enum(..texts)
-    }
+    __render-todo-list(pending, "No TODO items found.")
 
     heading(level: 1, complete-title)
-    if complete.len() == 0 {
-        [No TODO items found.]
-    } else {
-        let texts = complete.map(item => item.txt)
-        set enum(numbering: "1.a)")
-        strike(enum(..texts))
-    }
+    __render-todo-list(complete, "No TODO items found.", strike-items: true)
 
     heading(level: 1, abondon-title)
-    if abondon.len() == 0 {
-        [No TODO items found.]
-    } else {
-        let texts = abondon.map(item => item.txt)
-        set enum(numbering: "1.a)")
-        strike(enum(..texts))
-    }
+    __render-todo-list(abondon, "No TODO items found.", strike-items: true)
   }
 }
